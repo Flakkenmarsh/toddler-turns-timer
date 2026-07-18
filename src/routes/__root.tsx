@@ -77,14 +77,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Photo Timer" },
-      { name: "description", content: "Circular visual timer with your own photo. Drag to set, tap play, ring when done." },
+      { title: "Toddler Timer" },
+      { name: "description", content: "Visual timer to help toddlers take turns, or wait out activities.\nSet the turn duration, add a photo for each turn-taker." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Photo Timer" },
-      { property: "og:description", content: "Circular visual timer with your own photo." },
+      { property: "og:title", content: "Toddler Timer" },
+      { property: "og:description", content: "Visual timer to help toddlers take turns, or wait out activities.\nSet the turn duration, add a photo for each turn-taker." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Toddler Timer" },
+      { name: "twitter:description", content: "Visual timer to help toddlers take turns, or wait out activities.\nSet the turn duration, add a photo for each turn-taker." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/894416f4-8bf4-4dd5-add5-5f24f8e8c5b8/id-preview-f2a6b024--c7a642f1-a9df-4c16-a19b-6f9d74b555a1.lovable.app-1784375984898.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/894416f4-8bf4-4dd5-add5-5f24f8e8c5b8/id-preview-f2a6b024--c7a642f1-a9df-4c16-a19b-6f9d74b555a1.lovable.app-1784375984898.png" },
     ],
     links: [
       {
