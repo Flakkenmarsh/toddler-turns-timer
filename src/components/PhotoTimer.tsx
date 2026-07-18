@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Play, Pause, RotateCcw, ImagePlus } from "lucide-react";
+import { Play, Pause, RotateCcw, Plus, Trash2, Pencil, Users } from "lucide-react";
 
 const SIZE = 320;
 const CENTER = SIZE / 2;
 const RADIUS = CENTER - 6;
-const MAX_SECONDS = 60 * 60; // 60 min max
+const MAX_SECONDS = 30 * 60; // 30 min max
+
+type Player = { id: string; name: string; photo: string | null };
+
+const uid = () => Math.random().toString(36).slice(2, 10);
 
 function fmt(s: number) {
   s = Math.max(0, Math.ceil(s));
@@ -29,19 +33,21 @@ function piePath(fraction: number): string {
 }
 
 export function PhotoTimer() {
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [players, setPlayers] = useState<Player[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [duration, setDuration] = useState(15 * 60); // seconds, initial 15 min
-  const [remaining, setRemaining] = useState(15 * 60);
+  const [duration, setDuration] = useState(5 * 60); // seconds, initial 5 min
+  const [remaining, setRemaining] = useState(5 * 60);
   const [running, setRunning] = useState(false);
   const [alarming, setAlarming] = useState(false);
+  const [showRoster, setShowRoster] = useState(false);
   const dragging = useRef(false);
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const fileRef = useRef<HTMLInputElement | null>(null);
+  const photoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const audioCtxRef = useRef<AudioContext | null>(null);
   const alarmStopRef = useRef<(() => void) | null>(null);
 
-  const photo = photos[currentIndex] ?? null;
+  const currentPlayer = players[currentIndex] ?? null;
+  const photo = currentPlayer?.photo ?? null;
 
   // Timer tick
   useEffect(() => {
@@ -141,19 +147,41 @@ export function PhotoTimer() {
     }
   };
 
-  const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    if (!files.length) return;
-    const urls = files.map((f) => URL.createObjectURL(f));
-    setPhotos((prev) => [...prev, ...urls]);
-    e.target.value = "";
+  const addPlayer = () => {
+    setPlayers((prev) => [
+      ...prev,
+      { id: uid(), name: `Player ${prev.length + 1}`, photo: null },
+    ]);
+  };
+  const renamePlayer = (id: string, name: string) => {
+    setPlayers((prev) => prev.map((p) => (p.id === id ? { ...p, name } : p)));
+  };
+  const removePlayer = (id: string) => {
+    setPlayers((prev) => {
+      const idx = prev.findIndex((p) => p.id === id);
+      const target = prev[idx];
+      if (target?.photo) URL.revokeObjectURL(target.photo);
+      const next = prev.filter((p) => p.id !== id);
+      if (currentIndex >= next.length) setCurrentIndex(0);
+      return next;
+    });
+  };
+  const setPlayerPhoto = (id: string, file: File) => {
+    const url = URL.createObjectURL(file);
+    setPlayers((prev) =>
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        if (p.photo) URL.revokeObjectURL(p.photo);
+        return { ...p, photo: url };
+      }),
+    );
   };
 
   const togglePlay = () => {
     if (alarming) {
       stopAlarm();
-      // Advance to next player's photo
-      setCurrentIndex((i) => (photos.length ? (i + 1) % photos.length : 0));
+      // Advance to next player
+      setCurrentIndex((i) => (players.length ? (i + 1) % players.length : 0));
       setRemaining(duration);
       setRunning(true);
       return;
@@ -174,33 +202,92 @@ export function PhotoTimer() {
 
   const fraction = duration > 0 ? remaining / duration : 0;
   const path = piePath(fraction);
+  // Marker reflects the currently-set duration on the outer ring.
+  const markerFraction = duration / MAX_SECONDS;
   const lowTime = running && remaining <= 10 && remaining > 0;
-  const clearAllPhotos = () => {
-    photos.forEach((u) => URL.revokeObjectURL(u));
-    setPhotos([]);
-    setCurrentIndex(0);
-  };
+  const showMarker = !running && !alarming;
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-between py-10 px-6 bg-background text-foreground select-none">
       <header className="w-full flex items-center justify-between">
         <h1 className="text-lg font-semibold tracking-tight">Photo Timer</h1>
         <button
-          onClick={() => fileRef.current?.click()}
+          onClick={() => setShowRoster((s) => !s)}
           className="inline-flex items-center gap-2 rounded-full border border-border bg-card/40 backdrop-blur px-4 py-2 text-sm hover:bg-card/70 transition"
         >
-          <ImagePlus className="h-4 w-4" />
-          {photos.length ? `Add photo (${photos.length})` : "Add photos"}
+          <Users className="h-4 w-4" />
+          Players ({players.length})
         </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={handlePhoto}
-        />
       </header>
+
+      {showRoster && (
+        <div className="w-full max-w-md rounded-2xl border border-border bg-card/60 backdrop-blur p-3 space-y-2">
+          {players.length === 0 && (
+            <p className="text-xs text-muted-foreground text-center py-2">
+              No players yet. Add one to start a turn rotation.
+            </p>
+          )}
+          {players.map((p, i) => (
+            <div
+              key={p.id}
+              className={`flex items-center gap-2 rounded-xl px-2 py-2 ${i === currentIndex ? "bg-primary/10" : ""}`}
+            >
+              <button
+                onClick={() => photoInputRefs.current[p.id]?.click()}
+                className="h-10 w-10 rounded-full overflow-hidden border border-border bg-muted flex items-center justify-center shrink-0"
+                aria-label="Set photo"
+              >
+                {p.photo ? (
+                  <img src={p.photo} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <Pencil className="h-4 w-4 text-muted-foreground" />
+                )}
+              </button>
+              <input
+                ref={(el) => {
+                  photoInputRefs.current[p.id] = el;
+                }}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) setPlayerPhoto(p.id, f);
+                  e.target.value = "";
+                }}
+              />
+              <input
+                value={p.name}
+                onChange={(e) => renamePlayer(p.id, e.target.value)}
+                className="flex-1 bg-transparent border-b border-border/60 focus:border-primary outline-none text-sm py-1"
+              />
+              <button
+                onClick={() => setCurrentIndex(i)}
+                className="text-xs rounded-full px-2 py-1 border border-border hover:bg-card/70"
+              >
+                {i === currentIndex ? "Active" : "Set"}
+              </button>
+              <button
+                onClick={() => removePlayer(p.id)}
+                className="h-8 w-8 rounded-full flex items-center justify-center hover:bg-destructive/20 text-destructive"
+                aria-label="Remove"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+          <button
+            onClick={addPlayer}
+            className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-dashed border-border py-2 text-sm hover:bg-card/70 transition"
+          >
+            <Plus className="h-4 w-4" /> Add player
+          </button>
+        </div>
+      )}
+
+      <div className="h-6 text-sm font-medium tracking-wide">
+        {currentPlayer ? currentPlayer.name : ""}
+      </div>
 
       <div className="relative flex items-center justify-center">
         <svg
@@ -273,11 +360,11 @@ export function PhotoTimer() {
             strokeWidth={3}
           />
 
-          {/* Handle indicator on the edge at current fraction */}
-          {!running && !alarming && (
+          {/* Handle indicator on the edge at current duration */}
+          {showMarker && (
             <circle
-              cx={CENTER + RADIUS * Math.sin(fraction * Math.PI * 2)}
-              cy={CENTER - RADIUS * Math.cos(fraction * Math.PI * 2)}
+              cx={CENTER + RADIUS * Math.sin(markerFraction * Math.PI * 2)}
+              cy={CENTER - RADIUS * Math.cos(markerFraction * Math.PI * 2)}
               r={10}
               fill="oklch(0.98 0.005 260)"
               stroke="oklch(0.14 0.02 270)"
@@ -297,8 +384,8 @@ export function PhotoTimer() {
           <div className="mt-1 text-xs uppercase tracking-widest text-white/70">
             {alarming
               ? "Next player!"
-              : photos.length > 1
-                ? `Turn ${currentIndex + 1} of ${photos.length}`
+              : players.length > 1
+                ? `Turn ${currentIndex + 1} of ${players.length}`
                 : running
                   ? "Running"
                   : "Drag to set"}
@@ -328,12 +415,11 @@ export function PhotoTimer() {
           {running ? <Pause className="h-7 w-7" /> : <Play className="h-7 w-7 ml-1" />}
         </button>
         <button
-          onClick={clearAllPhotos}
-          disabled={!photos.length}
-          className="h-12 w-12 rounded-full border border-border bg-card/40 backdrop-blur flex items-center justify-center text-xs hover:bg-card/70 transition disabled:opacity-30"
-          aria-label="Clear photos"
+          onClick={() => setShowRoster(true)}
+          className="h-12 w-12 rounded-full border border-border bg-card/40 backdrop-blur flex items-center justify-center hover:bg-card/70 transition"
+          aria-label="Edit players"
         >
-          Clear
+          <Users className="h-5 w-5" />
         </button>
       </div>
     </div>
