@@ -29,7 +29,8 @@ function piePath(fraction: number): string {
 }
 
 export function PhotoTimer() {
-  const [photo, setPhoto] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [duration, setDuration] = useState(15 * 60); // seconds, initial 15 min
   const [remaining, setRemaining] = useState(15 * 60);
   const [running, setRunning] = useState(false);
@@ -39,6 +40,8 @@ export function PhotoTimer() {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const alarmStopRef = useRef<(() => void) | null>(null);
+
+  const photo = photos[currentIndex] ?? null;
 
   // Timer tick
   useEffect(() => {
@@ -139,19 +142,20 @@ export function PhotoTimer() {
   };
 
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const url = URL.createObjectURL(f);
-    setPhoto((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return url;
-    });
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+    const urls = files.map((f) => URL.createObjectURL(f));
+    setPhotos((prev) => [...prev, ...urls]);
+    e.target.value = "";
   };
 
   const togglePlay = () => {
     if (alarming) {
       stopAlarm();
+      // Advance to next player's photo
+      setCurrentIndex((i) => (photos.length ? (i + 1) % photos.length : 0));
       setRemaining(duration);
+      setRunning(true);
       return;
     }
     if (remaining <= 0) {
@@ -170,6 +174,12 @@ export function PhotoTimer() {
 
   const fraction = duration > 0 ? remaining / duration : 0;
   const path = piePath(fraction);
+  const lowTime = running && remaining <= 10 && remaining > 0;
+  const clearAllPhotos = () => {
+    photos.forEach((u) => URL.revokeObjectURL(u));
+    setPhotos([]);
+    setCurrentIndex(0);
+  };
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-between py-10 px-6 bg-background text-foreground select-none">
@@ -180,12 +190,13 @@ export function PhotoTimer() {
           className="inline-flex items-center gap-2 rounded-full border border-border bg-card/40 backdrop-blur px-4 py-2 text-sm hover:bg-card/70 transition"
         >
           <ImagePlus className="h-4 w-4" />
-          {photo ? "Change photo" : "Add photo"}
+          {photos.length ? `Add photo (${photos.length})` : "Add photos"}
         </button>
         <input
           ref={fileRef}
           type="file"
           accept="image/*"
+          multiple
           className="hidden"
           onChange={handlePhoto}
         />
@@ -197,7 +208,8 @@ export function PhotoTimer() {
           width={SIZE}
           height={SIZE}
           viewBox={`0 0 ${SIZE} ${SIZE}`}
-          className={`touch-none ${alarming ? "animate-pulse" : ""}`}
+          className={`touch-none transition-transform ${alarming ? "animate-pulse" : ""} ${lowTime ? "animate-[pulse_0.6s_ease-in-out_infinite]" : ""}`}
+          style={lowTime ? { filter: "drop-shadow(0 0 12px oklch(0.7 0.2 25))" } : undefined}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
@@ -283,7 +295,13 @@ export function PhotoTimer() {
             {fmt(remaining)}
           </div>
           <div className="mt-1 text-xs uppercase tracking-widest text-white/70">
-            {alarming ? "Time's up" : running ? "Running" : "Drag to set"}
+            {alarming
+              ? "Next player!"
+              : photos.length > 1
+                ? `Turn ${currentIndex + 1} of ${photos.length}`
+                : running
+                  ? "Running"
+                  : "Drag to set"}
           </div>
         </div>
       </div>
@@ -309,7 +327,14 @@ export function PhotoTimer() {
         >
           {running ? <Pause className="h-7 w-7" /> : <Play className="h-7 w-7 ml-1" />}
         </button>
-        <div className="h-12 w-12" />
+        <button
+          onClick={clearAllPhotos}
+          disabled={!photos.length}
+          className="h-12 w-12 rounded-full border border-border bg-card/40 backdrop-blur flex items-center justify-center text-xs hover:bg-card/70 transition disabled:opacity-30"
+          aria-label="Clear photos"
+        >
+          Clear
+        </button>
       </div>
     </div>
   );
