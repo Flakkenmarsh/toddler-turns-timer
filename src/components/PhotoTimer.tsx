@@ -129,7 +129,15 @@ export function PhotoTimer() {
   }, []);
 
   const onPointerDown = (e: React.PointerEvent) => {
-    if (running || alarming) return;
+    if (alarming) {
+      stopAlarm();
+      if (players.length) {
+        setCurrentIndex((i) => (i + 1) % players.length);
+      }
+      setRemaining(duration);
+      return;
+    }
+    if (running) return;
     dragging.current = true;
     (e.target as Element).setPointerCapture(e.pointerId);
     setFromPoint(e.clientX, e.clientY);
@@ -204,7 +212,6 @@ export function PhotoTimer() {
   const path = piePath(fraction);
   // Marker reflects the currently-set duration on the outer ring.
   const markerFraction = duration / MAX_SECONDS;
-  const lowTime = running && remaining <= 10 && remaining > 0;
   const showMarker = !running && !alarming;
 
   return (
@@ -295,8 +302,7 @@ export function PhotoTimer() {
           width={SIZE}
           height={SIZE}
           viewBox={`0 0 ${SIZE} ${SIZE}`}
-          className={`touch-none transition-transform ${alarming ? "animate-pulse" : ""} ${lowTime ? "animate-[pulse_0.6s_ease-in-out_infinite]" : ""}`}
-          style={lowTime ? { filter: "drop-shadow(0 0 12px oklch(0.7 0.2 25))" } : undefined}
+          className={`touch-none transition-transform ${alarming ? "animate-pulse" : ""}`}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
