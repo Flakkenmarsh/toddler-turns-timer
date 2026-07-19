@@ -306,25 +306,6 @@ export function PhotoTimer() {
             <clipPath id="pieClip">
               <path d={path} />
             </clipPath>
-            <pattern
-              id="photoPattern"
-              patternUnits="userSpaceOnUse"
-              width={SIZE}
-              height={SIZE}
-            >
-              {photo ? (
-                <image
-                  href={photo}
-                  x={0}
-                  y={0}
-                  width={SIZE}
-                  height={SIZE}
-                  preserveAspectRatio="xMidYMid slice"
-                />
-              ) : (
-                <rect width={SIZE} height={SIZE} fill="oklch(0.6 0.15 260)" />
-              )}
-            </pattern>
           </defs>
 
           {/* Empty ring background */}
@@ -346,7 +327,34 @@ export function PhotoTimer() {
           {/* Pie of remaining time filled with photo */}
           {fraction > 0 && (
             <g clipPath="url(#pieClip)">
-              <circle cx={CENTER} cy={CENTER} r={RADIUS} fill="url(#photoPattern)" />
+              {photo ? (
+                <image
+                  key={currentPlayer?.id ?? "none"}
+                  href={photo}
+                  x={0}
+                  y={0}
+                  width={SIZE}
+                  height={SIZE}
+                  preserveAspectRatio="xMidYMid slice"
+                />
+              ) : (
+                <circle cx={CENTER} cy={CENTER} r={RADIUS} fill="oklch(0.6 0.15 260)" />
+              )}
+              {/* Preload other players' images so switching turns is instant */}
+              {players.map((p) =>
+                p.photo && p.id !== currentPlayer?.id ? (
+                  <image
+                    key={`preload-${p.id}`}
+                    href={p.photo}
+                    x={0}
+                    y={0}
+                    width={1}
+                    height={1}
+                    opacity={0}
+                    preserveAspectRatio="xMidYMid slice"
+                  />
+                ) : null,
+              )}
             </g>
           )}
 
