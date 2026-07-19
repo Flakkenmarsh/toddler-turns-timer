@@ -4,7 +4,10 @@ import { Play, Pause, RotateCcw, Plus, Trash2, Pencil, Users } from "lucide-reac
 const SIZE = 320;
 const CENTER = SIZE / 2;
 const RADIUS = CENTER - 6;
+const MIN_SECONDS = 30;
 const MAX_SECONDS = 30 * 60; // 30 min max
+
+const DRAG_THRESHOLD_PX = 6;
 
 type Player = { id: string; name: string; photo: string | null };
 
@@ -41,7 +44,10 @@ export function PhotoTimer() {
   const [alarming, setAlarming] = useState(false);
   const [showRoster, setShowRoster] = useState(false);
   const dragging = useRef(false);
+  const dragStart = useRef({ angle: 0, duration: 0, x: 0, y: 0, hasMoved: false });
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const rosterRef = useRef<HTMLDivElement | null>(null);
+  const rosterButtonRef = useRef<HTMLButtonElement | null>(null);
   const photoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const audioCtxRef = useRef<AudioContext | null>(null);
   const alarmStopRef = useRef<(() => void) | null>(null);
@@ -106,27 +112,62 @@ export function PhotoTimer() {
     };
   }, [alarming]);
 
+  // Auto-close roster when touching outside the panel or trigger button
+  useEffect(() => {
+    if (!showRoster) return;
+    const close = (e: PointerEvent | TouchEvent) => {
+      const target = e.target as Node;
+      if (
+        rosterRef.current &&
+        rosterButtonRef.current &&
+        !rosterRef.current.contains(target) &&
+        !rosterButtonRef.current.contains(target)
+      ) {
+        setShowRoster(false);
+      }
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("touchstart", close);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("touchstart", close);
+    };
+  }, [showRoster]);
+
   const stopAlarm = () => {
     alarmStopRef.current?.();
     setAlarming(false);
   };
 
-  const setFromPoint = useCallback((clientX: number, clientY: number) => {
+  const angleFromPoint = useCallback((clientX: number, clientY: number) => {
     const svg = svgRef.current;
-    if (!svg) return;
+    if (!svg) return 0;
     const rect = svg.getBoundingClientRect();
     const x = clientX - rect.left - rect.width / 2;
     const y = clientY - rect.top - rect.height / 2;
     // angle from top, clockwise, 0..2π
     let a = Math.atan2(x, -y);
     if (a < 0) a += Math.PI * 2;
-    const fraction = a / (Math.PI * 2);
-    // Snap to 30-second increments
-    let secs = Math.round((fraction * MAX_SECONDS) / 30) * 30;
-    if (secs < 30) secs = 30;
-    setDuration(secs);
-    setRemaining(secs);
+    return a;
   }, []);
+
+  const setDurationFromDrag = useCallback((clientX: number, clientY: number) => {
+    const currentAngle = angleFromPoint(clientX, clientY);
+    let delta = currentAngle - dragStart.current.angle;
+    // Normalize to the smallest rotation direction (-π..π) so dragging never loops around.
+    if (delta > Math.PI) delta -= Math.PI * 2;
+    if (delta < -Math.PI) delta += Math.PI * 2;
+
+    const deltaSeconds = (delta / (Math.PI * 2)) * MAX_SECONDS;
+    let next = dragStart.current.duration + deltaSeconds;
+    // Snap to 30-second increments
+    next = Math.round(next / 30) * 30;
+    // Clamp: dragging stops at 00:30 and 30:00.
+    next = Math.max(MIN_SECONDS, Math.min(MAX_SECONDS, next));
+
+    setDuration(next);
+    setRemaining(next);
+  }, [angleFromPoint]);
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (alarming) {
@@ -137,21 +178,49 @@ export function PhotoTimer() {
       setRemaining(duration);
       return;
     }
-    if (running) return;
+    const el = e.target as Element;
+    el.setPointerCapture(e.pointerId);
     dragging.current = true;
-    (e.target as Element).setPointerCapture(e.pointerId);
-    setFromPoint(e.clientX, e.clientY);
+    dragStart.current = {
+      angle: angleFromPoint(e.clientX, e.clientY),
+      duration,
+      x: e.clientX,
+      y: e.clientY,
+      hasMoved: false,
+    };
   };
+
   const onPointerMove = (e: React.PointerEvent) => {
     if (!dragging.current) return;
-    setFromPoint(e.clientX, e.clientY);
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
+    if (Math.hypot(dx, dy) > DRAG_THRESHOLD_PX) {
+      dragStart.current.hasMoved = true;
+      // Pause if the user begins dragging while the timer is running.
+      if (running) setRunning(false);
+    }
+    if (dragStart.current.hasMoved) {
+      setDurationFromDrag(e.clientX, e.clientY);
+    }
   };
+
   const onPointerUp = (e: React.PointerEvent) => {
+    const wasDragging = dragging.current;
     dragging.current = false;
     try {
       (e.target as Element).releasePointerCapture(e.pointerId);
     } catch {
       /* noop */
+    }
+    if (!wasDragging) return;
+    if (!dragStart.current.hasMoved) {
+      // A clean tap toggles play/pause.
+      if (remaining <= 0) {
+        setRemaining(duration);
+        setRunning(true);
+      } else {
+        setRunning((r) => !r);
+      }
     }
   };
 
@@ -188,10 +257,8 @@ export function PhotoTimer() {
   const togglePlay = () => {
     if (alarming) {
       stopAlarm();
-      // Advance to next player
       setCurrentIndex((i) => (players.length ? (i + 1) % players.length : 0));
       setRemaining(duration);
-      setRunning(true);
       return;
     }
     if (remaining <= 0) {
@@ -219,6 +286,7 @@ export function PhotoTimer() {
       <header className="w-full flex items-center justify-between">
         <h1 className="text-lg font-semibold tracking-tight">Photo Timer</h1>
         <button
+          ref={rosterButtonRef}
           onClick={() => setShowRoster((s) => !s)}
           className="inline-flex items-center gap-2 rounded-full border border-border bg-card/40 backdrop-blur px-4 py-2 text-sm hover:bg-card/70 transition"
         >
@@ -228,7 +296,10 @@ export function PhotoTimer() {
       </header>
 
       {showRoster && (
-        <div className="w-full max-w-md rounded-2xl border border-border bg-card/60 backdrop-blur p-3 space-y-2">
+        <div
+          ref={rosterRef}
+          className="w-full max-w-md rounded-2xl border border-border bg-card/60 backdrop-blur p-3 space-y-2"
+        >
           {players.length === 0 && (
             <p className="text-xs text-muted-foreground text-center py-2">
               No players yet. Add one to start a turn rotation.
@@ -427,13 +498,6 @@ export function PhotoTimer() {
           aria-label={running ? "Pause" : "Play"}
         >
           {running ? <Pause className="h-7 w-7" /> : <Play className="h-7 w-7 ml-1" />}
-        </button>
-        <button
-          onClick={() => setShowRoster(true)}
-          className="h-12 w-12 rounded-full border border-border bg-card/40 backdrop-blur flex items-center justify-center hover:bg-card/70 transition"
-          aria-label="Edit players"
-        >
-          <Users className="h-5 w-5" />
         </button>
       </div>
     </div>
