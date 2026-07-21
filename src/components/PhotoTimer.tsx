@@ -51,6 +51,8 @@ export function PhotoTimer() {
   const photoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const audioCtxRef = useRef<AudioContext | null>(null);
   const alarmStopRef = useRef<(() => void) | null>(null);
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  const [flashOn, setFlashOn] = useState(true);
 
   const currentPlayer = players[currentIndex] ?? null;
   const photo = currentPlayer?.photo ?? null;
@@ -77,6 +79,51 @@ export function PhotoTimer() {
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running]);
+
+  // Keep screen awake while running
+  useEffect(() => {
+    if (!running) return;
+    let cancelled = false;
+    const nav = navigator as Navigator & {
+      wakeLock?: { request: (type: "screen") => Promise<WakeLockSentinel> };
+    };
+    const request = async () => {
+      try {
+        const sentinel = await nav.wakeLock?.request("screen");
+        if (sentinel) {
+          if (cancelled) {
+            sentinel.release().catch(() => {});
+          } else {
+            wakeLockRef.current = sentinel;
+          }
+        }
+      } catch {
+        /* noop */
+      }
+    };
+    request();
+    const onVis = () => {
+      if (document.visibilityState === "visible" && running) request();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVis);
+      wakeLockRef.current?.release().catch(() => {});
+      wakeLockRef.current = null;
+    };
+  }, [running]);
+
+  // Flash effect while alarming
+  useEffect(() => {
+    if (!alarming) {
+      setFlashOn(true);
+      return;
+    }
+    setFlashOn(true);
+    const iv = setInterval(() => setFlashOn((f) => !f), 350);
+    return () => clearInterval(iv);
+  }, [alarming]);
 
   // Alarm sound
   useEffect(() => {
@@ -276,7 +323,9 @@ export function PhotoTimer() {
   };
 
   const fraction = duration > 0 ? remaining / duration : 0;
-  const path = piePath(fraction);
+  // While alarming, show the full circle of the just-ended player's photo so it can flash.
+  const displayFraction = alarming ? 1 : fraction;
+  const path = piePath(displayFraction);
   // Marker reflects the currently-set duration on the outer ring.
   const markerFraction = duration / MAX_SECONDS;
   const showMarker = !running && !alarming;
@@ -402,8 +451,8 @@ export function PhotoTimer() {
           />
 
           {/* Pie of remaining time filled with photo */}
-          {fraction > 0 && (
-            <g clipPath="url(#pieClip)">
+          {displayFraction > 0 && (
+            <g clipPath="url(#pieClip)" opacity={alarming && !flashOn ? 0 : 1}>
               {photo ? (
                 <image
                   key={currentPlayer?.id ?? "none"}
