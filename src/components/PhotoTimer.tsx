@@ -51,6 +51,8 @@ export function PhotoTimer() {
   const photoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const audioCtxRef = useRef<AudioContext | null>(null);
   const alarmStopRef = useRef<(() => void) | null>(null);
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  const [flashOn, setFlashOn] = useState(true);
 
   const currentPlayer = players[currentIndex] ?? null;
   const photo = currentPlayer?.photo ?? null;
@@ -77,6 +79,51 @@ export function PhotoTimer() {
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running]);
+
+  // Keep screen awake while running
+  useEffect(() => {
+    if (!running) return;
+    let cancelled = false;
+    const nav = navigator as Navigator & {
+      wakeLock?: { request: (type: "screen") => Promise<WakeLockSentinel> };
+    };
+    const request = async () => {
+      try {
+        const sentinel = await nav.wakeLock?.request("screen");
+        if (sentinel) {
+          if (cancelled) {
+            sentinel.release().catch(() => {});
+          } else {
+            wakeLockRef.current = sentinel;
+          }
+        }
+      } catch {
+        /* noop */
+      }
+    };
+    request();
+    const onVis = () => {
+      if (document.visibilityState === "visible" && running) request();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVis);
+      wakeLockRef.current?.release().catch(() => {});
+      wakeLockRef.current = null;
+    };
+  }, [running]);
+
+  // Flash effect while alarming
+  useEffect(() => {
+    if (!alarming) {
+      setFlashOn(true);
+      return;
+    }
+    setFlashOn(true);
+    const iv = setInterval(() => setFlashOn((f) => !f), 350);
+    return () => clearInterval(iv);
+  }, [alarming]);
 
   // Alarm sound
   useEffect(() => {
