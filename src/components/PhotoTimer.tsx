@@ -323,7 +323,9 @@ export function PhotoTimer() {
   };
 
   const fraction = duration > 0 ? remaining / duration : 0;
-  const path = piePath(fraction);
+  // While alarming, show the full circle of the just-ended player's photo so it can flash.
+  const displayFraction = alarming ? 1 : fraction;
+  const path = piePath(displayFraction);
   // Marker reflects the currently-set duration on the outer ring.
   const markerFraction = duration / MAX_SECONDS;
   const showMarker = !running && !alarming;
@@ -449,8 +451,8 @@ export function PhotoTimer() {
           />
 
           {/* Pie of remaining time filled with photo */}
-          {fraction > 0 && (
-            <g clipPath="url(#pieClip)">
+          {displayFraction > 0 && (
+            <g clipPath="url(#pieClip)" opacity={alarming && !flashOn ? 0 : 1}>
               {photo ? (
                 <image
                   key={currentPlayer?.id ?? "none"}
