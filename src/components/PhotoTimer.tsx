@@ -461,6 +461,17 @@ export function PhotoTimer() {
       <div className="min-h-10 text-3xl font-semibold tracking-tight text-center">
         {currentPlayer ? currentPlayer.name : ""}
       </div>
+      {currentPlayer && (
+        <div className="flex justify-center -mt-1">
+          <button
+            onClick={() => setPickerPlayerId(currentPlayer.id)}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/40 backdrop-blur px-3 py-1 text-xs hover:bg-card/70 transition"
+          >
+            <ImageIcon className="h-3.5 w-3.5" />
+            Change photo
+          </button>
+        </div>
+      )}
 
       <div className="relative flex items-center justify-center">
         <svg
