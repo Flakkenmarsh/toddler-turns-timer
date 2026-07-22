@@ -8,6 +8,8 @@ const MIN_SECONDS = 30;
 const MAX_SECONDS = 30 * 60; // 30 min max
 
 const DRAG_THRESHOLD_PX = 6;
+const RECENTS_KEY = "photoTimer.recentImages.v1";
+const MAX_RECENTS = 10;
 
 type Player = { id: string; name: string; photo: string | null };
 
@@ -18,6 +20,15 @@ function fmt(s: number) {
   const m = Math.floor(s / 60);
   const sec = s % 60;
   return `${m}:${sec.toString().padStart(2, "0")}`;
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
 }
 
 /** Build an SVG path for a pie slice from top (12 o'clock) clockwise, fraction 0..1 */
@@ -43,6 +54,8 @@ export function PhotoTimer() {
   const [running, setRunning] = useState(false);
   const [alarming, setAlarming] = useState(false);
   const [showRoster, setShowRoster] = useState(false);
+  const [pickerPlayerId, setPickerPlayerId] = useState<string | null>(null);
+  const [recents, setRecents] = useState<string[]>([]);
   const dragging = useRef(false);
   const dragStart = useRef({ angle: 0, duration: 0, x: 0, y: 0, hasMoved: false });
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -53,6 +66,37 @@ export function PhotoTimer() {
   const alarmStopRef = useRef<(() => void) | null>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const [flashOn, setFlashOn] = useState(true);
+
+  // Load recents from localStorage
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(RECENTS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setRecents(parsed.filter((x) => typeof x === "string").slice(0, MAX_RECENTS));
+      }
+    } catch {
+      /* noop */
+    }
+  }, []);
+
+  const persistRecents = (list: string[]) => {
+    setRecents(list);
+    try {
+      localStorage.setItem(RECENTS_KEY, JSON.stringify(list));
+    } catch {
+      /* noop, quota */
+    }
+  };
+
+  const pushRecent = (dataUrl: string) => {
+    const next = [dataUrl, ...recents.filter((u) => u !== dataUrl)].slice(0, MAX_RECENTS);
+    persistRecents(next);
+  };
+
+  const removeRecent = (dataUrl: string) => {
+    persistRecents(recents.filter((u) => u !== dataUrl));
+  };
 
   const currentPlayer = players[currentIndex] ?? null;
   const photo = currentPlayer?.photo ?? null;
@@ -282,23 +326,22 @@ export function PhotoTimer() {
   };
   const removePlayer = (id: string) => {
     setPlayers((prev) => {
-      const idx = prev.findIndex((p) => p.id === id);
-      const target = prev[idx];
-      if (target?.photo) URL.revokeObjectURL(target.photo);
       const next = prev.filter((p) => p.id !== id);
       if (currentIndex >= next.length) setCurrentIndex(0);
       return next;
     });
   };
-  const setPlayerPhoto = (id: string, file: File) => {
-    const url = URL.createObjectURL(file);
-    setPlayers((prev) =>
-      prev.map((p) => {
-        if (p.id !== id) return p;
-        if (p.photo) URL.revokeObjectURL(p.photo);
-        return { ...p, photo: url };
-      }),
-    );
+  const assignPhoto = (id: string, dataUrl: string) => {
+    setPlayers((prev) => prev.map((p) => (p.id === id ? { ...p, photo: dataUrl } : p)));
+  };
+  const setPlayerPhotoFromFile = async (id: string, file: File) => {
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      assignPhoto(id, dataUrl);
+      pushRecent(dataUrl);
+    } catch {
+      /* noop */
+    }
   };
 
   const togglePlay = () => {
