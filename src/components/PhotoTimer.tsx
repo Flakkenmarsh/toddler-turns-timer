@@ -8,6 +8,8 @@ const MIN_SECONDS = 30;
 const MAX_SECONDS = 30 * 60; // 30 min max
 
 const DRAG_THRESHOLD_PX = 6;
+const RECENTS_KEY = "photoTimer.recentImages.v1";
+const MAX_RECENTS = 10;
 
 type Player = { id: string; name: string; photo: string | null };
 
@@ -18,6 +20,15 @@ function fmt(s: number) {
   const m = Math.floor(s / 60);
   const sec = s % 60;
   return `${m}:${sec.toString().padStart(2, "0")}`;
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
 }
 
 /** Build an SVG path for a pie slice from top (12 o'clock) clockwise, fraction 0..1 */
@@ -43,6 +54,8 @@ export function PhotoTimer() {
   const [running, setRunning] = useState(false);
   const [alarming, setAlarming] = useState(false);
   const [showRoster, setShowRoster] = useState(false);
+  const [pickerPlayerId, setPickerPlayerId] = useState<string | null>(null);
+  const [recents, setRecents] = useState<string[]>([]);
   const dragging = useRef(false);
   const dragStart = useRef({ angle: 0, duration: 0, x: 0, y: 0, hasMoved: false });
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -53,6 +66,37 @@ export function PhotoTimer() {
   const alarmStopRef = useRef<(() => void) | null>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const [flashOn, setFlashOn] = useState(true);
+
+  // Load recents from localStorage
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(RECENTS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setRecents(parsed.filter((x) => typeof x === "string").slice(0, MAX_RECENTS));
+      }
+    } catch {
+      /* noop */
+    }
+  }, []);
+
+  const persistRecents = (list: string[]) => {
+    setRecents(list);
+    try {
+      localStorage.setItem(RECENTS_KEY, JSON.stringify(list));
+    } catch {
+      /* noop, quota */
+    }
+  };
+
+  const pushRecent = (dataUrl: string) => {
+    const next = [dataUrl, ...recents.filter((u) => u !== dataUrl)].slice(0, MAX_RECENTS);
+    persistRecents(next);
+  };
+
+  const removeRecent = (dataUrl: string) => {
+    persistRecents(recents.filter((u) => u !== dataUrl));
+  };
 
   const currentPlayer = players[currentIndex] ?? null;
   const photo = currentPlayer?.photo ?? null;
@@ -282,23 +326,22 @@ export function PhotoTimer() {
   };
   const removePlayer = (id: string) => {
     setPlayers((prev) => {
-      const idx = prev.findIndex((p) => p.id === id);
-      const target = prev[idx];
-      if (target?.photo) URL.revokeObjectURL(target.photo);
       const next = prev.filter((p) => p.id !== id);
       if (currentIndex >= next.length) setCurrentIndex(0);
       return next;
     });
   };
-  const setPlayerPhoto = (id: string, file: File) => {
-    const url = URL.createObjectURL(file);
-    setPlayers((prev) =>
-      prev.map((p) => {
-        if (p.id !== id) return p;
-        if (p.photo) URL.revokeObjectURL(p.photo);
-        return { ...p, photo: url };
-      }),
-    );
+  const assignPhoto = (id: string, dataUrl: string) => {
+    setPlayers((prev) => prev.map((p) => (p.id === id ? { ...p, photo: dataUrl } : p)));
+  };
+  const setPlayerPhotoFromFile = async (id: string, file: File) => {
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      assignPhoto(id, dataUrl);
+      pushRecent(dataUrl);
+    } catch {
+      /* noop */
+    }
   };
 
   const togglePlay = () => {
@@ -360,7 +403,7 @@ export function PhotoTimer() {
               className={`flex items-center gap-2 rounded-xl px-2 py-2 ${i === currentIndex ? "bg-primary/10" : ""}`}
             >
               <button
-                onClick={() => photoInputRefs.current[p.id]?.click()}
+                onClick={() => setPickerPlayerId(p.id)}
                 className="h-10 w-10 rounded-full overflow-hidden border border-border bg-muted flex items-center justify-center shrink-0"
                 aria-label="Set photo"
               >
@@ -379,7 +422,10 @@ export function PhotoTimer() {
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f) setPlayerPhoto(p.id, f);
+                  if (f) {
+                    setPlayerPhotoFromFile(p.id, f);
+                    setPickerPlayerId(null);
+                  }
                   e.target.value = "";
                 }}
               />
@@ -412,7 +458,7 @@ export function PhotoTimer() {
         </div>
       )}
 
-      <div className="h-6 text-sm font-medium tracking-wide">
+      <div className="min-h-10 text-3xl font-semibold tracking-tight text-center">
         {currentPlayer ? currentPlayer.name : ""}
       </div>
 
@@ -549,6 +595,66 @@ export function PhotoTimer() {
           {running ? <Pause className="h-7 w-7" /> : <Play className="h-7 w-7 ml-1" />}
         </button>
       </div>
+
+      {pickerPlayerId && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => setPickerPlayerId(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-t-2xl sm:rounded-2xl border border-border bg-card p-4 space-y-3"
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold">Choose photo</h2>
+              <button
+                onClick={() => setPickerPlayerId(null)}
+                className="text-sm text-muted-foreground hover:text-foreground"
+              >
+                Close
+              </button>
+            </div>
+            <button
+              onClick={() => photoInputRefs.current[pickerPlayerId]?.click()}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-sm hover:bg-card/70 transition"
+            >
+              <Plus className="h-4 w-4" /> Pick new photo from device
+            </button>
+            {recents.length > 0 ? (
+              <>
+                <p className="text-xs text-muted-foreground">Recent photos</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {recents.map((url) => (
+                    <div key={url} className="relative group">
+                      <button
+                        onClick={() => {
+                          assignPhoto(pickerPlayerId, url);
+                          pushRecent(url);
+                          setPickerPlayerId(null);
+                        }}
+                        className="aspect-square w-full rounded-lg overflow-hidden border border-border bg-muted"
+                      >
+                        <img src={url} alt="" className="h-full w-full object-cover" />
+                      </button>
+                      <button
+                        onClick={() => removeRecent(url)}
+                        className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-80 hover:opacity-100"
+                        aria-label="Remove recent"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground text-center py-2">
+                No recent photos yet. Pick one to start building your list (stored only on this device).
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
