@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Play, Pause, RotateCcw, Plus, Trash2, Pencil, Users } from "lucide-react";
+import { Play, Pause, RotateCcw, Plus, Trash2, Pencil, Users, Image as ImageIcon } from "lucide-react";
 
 const SIZE = 320;
 const CENTER = SIZE / 2;
