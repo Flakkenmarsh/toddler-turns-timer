@@ -458,7 +458,7 @@ export function PhotoTimer() {
         </div>
       )}
 
-      <div className="h-6 text-sm font-medium tracking-wide">
+      <div className="min-h-10 text-3xl font-semibold tracking-tight text-center">
         {currentPlayer ? currentPlayer.name : ""}
       </div>
 
