@@ -62,6 +62,7 @@ export function PhotoTimer() {
   const rosterRef = useRef<HTMLDivElement | null>(null);
   const rosterButtonRef = useRef<HTMLButtonElement | null>(null);
   const photoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const modalPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const alarmStopRef = useRef<(() => void) | null>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
@@ -615,11 +616,25 @@ export function PhotoTimer() {
               </button>
             </div>
             <button
-              onClick={() => photoInputRefs.current[pickerPlayerId]?.click()}
+              onClick={() => modalPhotoInputRef.current?.click()}
               className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-sm hover:bg-card/70 transition"
             >
               <Plus className="h-4 w-4" /> Pick new photo from device
             </button>
+            <input
+              ref={modalPhotoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f && pickerPlayerId) {
+                  setPlayerPhotoFromFile(pickerPlayerId, f);
+                  setPickerPlayerId(null);
+                }
+                e.target.value = "";
+              }}
+            />
             {recents.length > 0 ? (
               <>
                 <p className="text-xs text-muted-foreground">Recent photos</p>
