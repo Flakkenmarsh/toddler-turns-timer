@@ -595,6 +595,66 @@ export function PhotoTimer() {
           {running ? <Pause className="h-7 w-7" /> : <Play className="h-7 w-7 ml-1" />}
         </button>
       </div>
+
+      {pickerPlayerId && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => setPickerPlayerId(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-t-2xl sm:rounded-2xl border border-border bg-card p-4 space-y-3"
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold">Choose photo</h2>
+              <button
+                onClick={() => setPickerPlayerId(null)}
+                className="text-sm text-muted-foreground hover:text-foreground"
+              >
+                Close
+              </button>
+            </div>
+            <button
+              onClick={() => photoInputRefs.current[pickerPlayerId]?.click()}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-sm hover:bg-card/70 transition"
+            >
+              <Plus className="h-4 w-4" /> Pick new photo from device
+            </button>
+            {recents.length > 0 ? (
+              <>
+                <p className="text-xs text-muted-foreground">Recent photos</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {recents.map((url) => (
+                    <div key={url} className="relative group">
+                      <button
+                        onClick={() => {
+                          assignPhoto(pickerPlayerId, url);
+                          pushRecent(url);
+                          setPickerPlayerId(null);
+                        }}
+                        className="aspect-square w-full rounded-lg overflow-hidden border border-border bg-muted"
+                      >
+                        <img src={url} alt="" className="h-full w-full object-cover" />
+                      </button>
+                      <button
+                        onClick={() => removeRecent(url)}
+                        className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-80 hover:opacity-100"
+                        aria-label="Remove recent"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground text-center py-2">
+                No recent photos yet. Pick one to start building your list (stored only on this device).
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
