@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Play, Pause, RotateCcw, Plus, Trash2, Pencil, Users, Image as ImageIcon } from "lucide-react";
+import { Play, Pause, RotateCcw, Plus, Trash2, Pencil, Users } from "lucide-react";
 
 const SIZE = 320;
 const CENTER = SIZE / 2;
@@ -62,6 +62,7 @@ export function PhotoTimer() {
   const rosterRef = useRef<HTMLDivElement | null>(null);
   const rosterButtonRef = useRef<HTMLButtonElement | null>(null);
   const photoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const modalPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const alarmStopRef = useRef<(() => void) | null>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
@@ -461,17 +462,6 @@ export function PhotoTimer() {
       <div className="min-h-10 text-3xl font-semibold tracking-tight text-center">
         {currentPlayer ? currentPlayer.name : ""}
       </div>
-      {currentPlayer && (
-        <div className="flex justify-center -mt-1">
-          <button
-            onClick={() => setPickerPlayerId(currentPlayer.id)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/40 backdrop-blur px-3 py-1 text-xs hover:bg-card/70 transition"
-          >
-            <ImageIcon className="h-3.5 w-3.5" />
-            Change photo
-          </button>
-        </div>
-      )}
 
       <div className="relative flex items-center justify-center">
         <svg
@@ -626,11 +616,25 @@ export function PhotoTimer() {
               </button>
             </div>
             <button
-              onClick={() => photoInputRefs.current[pickerPlayerId]?.click()}
+              onClick={() => modalPhotoInputRef.current?.click()}
               className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-sm hover:bg-card/70 transition"
             >
               <Plus className="h-4 w-4" /> Pick new photo from device
             </button>
+            <input
+              ref={modalPhotoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f && pickerPlayerId) {
+                  setPlayerPhotoFromFile(pickerPlayerId, f);
+                  setPickerPlayerId(null);
+                }
+                e.target.value = "";
+              }}
+            />
             {recents.length > 0 ? (
               <>
                 <p className="text-xs text-muted-foreground">Recent photos</p>
