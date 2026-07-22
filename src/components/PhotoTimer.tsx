@@ -403,7 +403,7 @@ export function PhotoTimer() {
               className={`flex items-center gap-2 rounded-xl px-2 py-2 ${i === currentIndex ? "bg-primary/10" : ""}`}
             >
               <button
-                onClick={() => photoInputRefs.current[p.id]?.click()}
+                onClick={() => setPickerPlayerId(p.id)}
                 className="h-10 w-10 rounded-full overflow-hidden border border-border bg-muted flex items-center justify-center shrink-0"
                 aria-label="Set photo"
               >
@@ -422,7 +422,10 @@ export function PhotoTimer() {
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f) setPlayerPhoto(p.id, f);
+                  if (f) {
+                    setPlayerPhotoFromFile(p.id, f);
+                    setPickerPlayerId(null);
+                  }
                   e.target.value = "";
                 }}
               />
