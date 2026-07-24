@@ -507,7 +507,7 @@ export function PhotoTimer() {
           {currentPlayer ? currentPlayer.name : ""}
         </div>
 
-      <div className="relative flex items-center justify-center">
+        <div className="relative flex items-center justify-center">
         <svg
           ref={svgRef}
           width={SIZE}
