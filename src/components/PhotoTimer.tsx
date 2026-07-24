@@ -231,6 +231,30 @@ export function PhotoTimer() {
     setAlarming(false);
   };
 
+  const enterFullscreen = () => {
+    const el = document.documentElement as HTMLElement & {
+      webkitRequestFullscreen?: () => Promise<void>;
+    };
+    try {
+      if (!document.fullscreenElement) {
+        (el.requestFullscreen?.() ?? el.webkitRequestFullscreen?.())?.catch(() => {});
+      }
+    } catch {
+      /* noop */
+    }
+  };
+
+  const exitFullscreen = () => {
+    const doc = document as Document & { webkitExitFullscreen?: () => Promise<void> };
+    try {
+      if (document.fullscreenElement) {
+        (doc.exitFullscreen?.() ?? doc.webkitExitFullscreen?.())?.catch(() => {});
+      }
+    } catch {
+      /* noop */
+    }
+  };
+
   const angleFromPoint = useCallback((clientX: number, clientY: number) => {
     const svg = svgRef.current;
     if (!svg) return 0;
@@ -270,6 +294,7 @@ export function PhotoTimer() {
   const onPointerDown = (e: React.PointerEvent) => {
     if (alarming) {
       stopAlarm();
+      exitFullscreen();
       if (players.length) {
         setCurrentIndex((i) => (i + 1) % players.length);
       }
@@ -316,8 +341,13 @@ export function PhotoTimer() {
       if (remaining <= 0) {
         setRemaining(duration);
         setRunning(true);
+        enterFullscreen();
       } else {
-        setRunning((r) => !r);
+        setRunning((r) => {
+          if (r) exitFullscreen();
+          else enterFullscreen();
+          return !r;
+        });
       }
     }
   };
@@ -354,6 +384,7 @@ export function PhotoTimer() {
   const togglePlay = () => {
     if (alarming) {
       stopAlarm();
+      exitFullscreen();
       setCurrentIndex((i) => (players.length ? (i + 1) % players.length : 0));
       setRemaining(duration);
       return;
@@ -361,14 +392,20 @@ export function PhotoTimer() {
     if (remaining <= 0) {
       setRemaining(duration);
       setRunning(true);
+      enterFullscreen();
       return;
     }
-    setRunning((r) => !r);
+    setRunning((r) => {
+      if (r) exitFullscreen();
+      else enterFullscreen();
+      return !r;
+    });
   };
 
   const reset = () => {
     stopAlarm();
     setRunning(false);
+    exitFullscreen();
     setRemaining(duration);
   };
 
