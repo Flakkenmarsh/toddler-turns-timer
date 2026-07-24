@@ -245,20 +245,26 @@ export function PhotoTimer() {
 
   const setDurationFromDrag = useCallback((clientX: number, clientY: number) => {
     const currentAngle = angleFromPoint(clientX, clientY);
+    // Accumulate the incremental rotation since the last move so a full sweep
+    // from 00:30 to 30:00 never flips direction when passing the halfway mark.
     let delta = currentAngle - dragStart.current.angle;
-    // Normalize to the smallest rotation direction (-π..π) so dragging never loops around.
     if (delta > Math.PI) delta -= Math.PI * 2;
     if (delta < -Math.PI) delta += Math.PI * 2;
+    dragStart.current.angle = currentAngle;
 
     const deltaSeconds = (delta / (Math.PI * 2)) * MAX_SECONDS;
     let next = dragStart.current.duration + deltaSeconds;
-    // Snap to 30-second increments
-    next = Math.round(next / 30) * 30;
     // Clamp: dragging stops at 00:30 and 30:00.
     next = Math.max(MIN_SECONDS, Math.min(MAX_SECONDS, next));
+    dragStart.current.duration = next;
 
-    setDuration(next);
-    setRemaining(next);
+    // Snap to 30-second increments for display.
+    const snapped = Math.max(
+      MIN_SECONDS,
+      Math.min(MAX_SECONDS, Math.round(next / 30) * 30),
+    );
+    setDuration(snapped);
+    setRemaining(snapped);
   }, [angleFromPoint]);
 
   const onPointerDown = (e: React.PointerEvent) => {
