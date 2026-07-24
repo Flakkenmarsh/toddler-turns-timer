@@ -502,9 +502,10 @@ export function PhotoTimer() {
         </div>
       )}
 
-      <div className={`min-h-10 text-3xl font-semibold tracking-tight text-center ${running ? "mb-4" : ""}`}>
-        {currentPlayer ? currentPlayer.name : ""}
-      </div>
+      <div className="relative flex flex-col items-center justify-center">
+        <div className={`min-h-10 text-3xl font-semibold tracking-tight text-center whitespace-nowrap ${running ? "absolute -top-14 left-1/2 -translate-x-1/2" : "mb-4"}`}>
+          {currentPlayer ? currentPlayer.name : ""}
+        </div>
 
       <div className="relative flex items-center justify-center">
         <svg
