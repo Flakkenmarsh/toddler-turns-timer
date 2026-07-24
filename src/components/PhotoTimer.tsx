@@ -616,6 +616,7 @@ export function PhotoTimer() {
                   : "Drag to set"}
           </div>
         </div>
+        </div>
       </div>
 
       <div className={`items-center gap-6 ${running ? "hidden" : "flex"}`}>
