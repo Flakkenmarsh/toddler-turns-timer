@@ -419,7 +419,7 @@ export function PhotoTimer() {
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-between py-10 px-6 bg-background text-foreground select-none">
-      <header className="w-full flex items-center justify-between">
+      <header className={`w-full flex items-center justify-between ${running ? "hidden" : ""}`}>
         <h1 className="text-lg font-semibold tracking-tight">Photo Timer</h1>
         <button
           ref={rosterButtonRef}
@@ -431,7 +431,7 @@ export function PhotoTimer() {
         </button>
       </header>
 
-      {showRoster && (
+      {showRoster && !running && (
         <div
           ref={rosterRef}
           className="w-full max-w-md rounded-2xl border border-border bg-card/60 backdrop-blur p-3 space-y-2"
@@ -617,7 +617,7 @@ export function PhotoTimer() {
         </div>
       </div>
 
-      <div className="flex items-center gap-6">
+      <div className={`items-center gap-6 ${running ? "hidden" : "flex"}`}>
         <button
           onClick={reset}
           className="h-12 w-12 rounded-full border border-border bg-card/40 backdrop-blur flex items-center justify-center hover:bg-card/70 transition"
