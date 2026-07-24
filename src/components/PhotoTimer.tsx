@@ -418,7 +418,7 @@ export function PhotoTimer() {
   const showMarker = !running && !alarming;
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-between py-10 px-6 bg-background text-foreground select-none">
+    <div className={`min-h-screen w-full flex flex-col items-center ${running ? "justify-center py-6" : "justify-between py-10"} px-6 bg-background text-foreground select-none`}>
       <header className={`w-full flex items-center justify-between ${running ? "hidden" : ""}`}>
         <h1 className="text-lg font-semibold tracking-tight">Photo Timer</h1>
         <button
@@ -502,11 +502,12 @@ export function PhotoTimer() {
         </div>
       )}
 
-      <div className="min-h-10 text-3xl font-semibold tracking-tight text-center">
-        {currentPlayer ? currentPlayer.name : ""}
-      </div>
+      <div className="relative flex flex-col items-center justify-center">
+        <div className={`min-h-10 text-3xl font-semibold tracking-tight text-center whitespace-nowrap ${running ? "absolute -top-14 left-1/2 -translate-x-1/2" : "mb-4"}`}>
+          {currentPlayer ? currentPlayer.name : ""}
+        </div>
 
-      <div className="relative flex items-center justify-center">
+        <div className="relative flex items-center justify-center">
         <svg
           ref={svgRef}
           width={SIZE}
@@ -614,6 +615,7 @@ export function PhotoTimer() {
                   ? "Running"
                   : "Drag to set"}
           </div>
+        </div>
         </div>
       </div>
 
