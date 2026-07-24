@@ -231,6 +231,30 @@ export function PhotoTimer() {
     setAlarming(false);
   };
 
+  const enterFullscreen = () => {
+    const el = document.documentElement as HTMLElement & {
+      webkitRequestFullscreen?: () => Promise<void>;
+    };
+    try {
+      if (!document.fullscreenElement) {
+        (el.requestFullscreen?.() ?? el.webkitRequestFullscreen?.())?.catch(() => {});
+      }
+    } catch {
+      /* noop */
+    }
+  };
+
+  const exitFullscreen = () => {
+    const doc = document as Document & { webkitExitFullscreen?: () => Promise<void> };
+    try {
+      if (document.fullscreenElement) {
+        (doc.exitFullscreen?.() ?? doc.webkitExitFullscreen?.())?.catch(() => {});
+      }
+    } catch {
+      /* noop */
+    }
+  };
+
   const angleFromPoint = useCallback((clientX: number, clientY: number) => {
     const svg = svgRef.current;
     if (!svg) return 0;
@@ -270,6 +294,7 @@ export function PhotoTimer() {
   const onPointerDown = (e: React.PointerEvent) => {
     if (alarming) {
       stopAlarm();
+      exitFullscreen();
       if (players.length) {
         setCurrentIndex((i) => (i + 1) % players.length);
       }
@@ -316,8 +341,13 @@ export function PhotoTimer() {
       if (remaining <= 0) {
         setRemaining(duration);
         setRunning(true);
+        enterFullscreen();
       } else {
-        setRunning((r) => !r);
+        setRunning((r) => {
+          if (r) exitFullscreen();
+          else enterFullscreen();
+          return !r;
+        });
       }
     }
   };
@@ -354,6 +384,7 @@ export function PhotoTimer() {
   const togglePlay = () => {
     if (alarming) {
       stopAlarm();
+      exitFullscreen();
       setCurrentIndex((i) => (players.length ? (i + 1) % players.length : 0));
       setRemaining(duration);
       return;
@@ -361,14 +392,20 @@ export function PhotoTimer() {
     if (remaining <= 0) {
       setRemaining(duration);
       setRunning(true);
+      enterFullscreen();
       return;
     }
-    setRunning((r) => !r);
+    setRunning((r) => {
+      if (r) exitFullscreen();
+      else enterFullscreen();
+      return !r;
+    });
   };
 
   const reset = () => {
     stopAlarm();
     setRunning(false);
+    exitFullscreen();
     setRemaining(duration);
   };
 
@@ -382,7 +419,7 @@ export function PhotoTimer() {
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-between py-10 px-6 bg-background text-foreground select-none">
-      <header className="w-full flex items-center justify-between">
+      <header className={`w-full flex items-center justify-between ${running ? "hidden" : ""}`}>
         <h1 className="text-lg font-semibold tracking-tight">Photo Timer</h1>
         <button
           ref={rosterButtonRef}
@@ -394,7 +431,7 @@ export function PhotoTimer() {
         </button>
       </header>
 
-      {showRoster && (
+      {showRoster && !running && (
         <div
           ref={rosterRef}
           className="w-full max-w-md rounded-2xl border border-border bg-card/60 backdrop-blur p-3 space-y-2"
@@ -580,7 +617,7 @@ export function PhotoTimer() {
         </div>
       </div>
 
-      <div className="flex items-center gap-6">
+      <div className={`items-center gap-6 ${running ? "hidden" : "flex"}`}>
         <button
           onClick={reset}
           className="h-12 w-12 rounded-full border border-border bg-card/40 backdrop-blur flex items-center justify-center hover:bg-card/70 transition"
