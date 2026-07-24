@@ -418,7 +418,7 @@ export function PhotoTimer() {
   const showMarker = !running && !alarming;
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-between py-10 px-6 bg-background text-foreground select-none">
+    <div className={`min-h-screen w-full flex flex-col items-center ${running ? "justify-center py-6" : "justify-between py-10"} px-6 bg-background text-foreground select-none`}>
       <header className={`w-full flex items-center justify-between ${running ? "hidden" : ""}`}>
         <h1 className="text-lg font-semibold tracking-tight">Photo Timer</h1>
         <button
