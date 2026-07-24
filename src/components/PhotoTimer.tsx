@@ -502,7 +502,7 @@ export function PhotoTimer() {
         </div>
       )}
 
-      <div className="min-h-10 text-3xl font-semibold tracking-tight text-center">
+      <div className={`min-h-10 text-3xl font-semibold tracking-tight text-center ${running ? "mb-4" : ""}`}>
         {currentPlayer ? currentPlayer.name : ""}
       </div>
 
