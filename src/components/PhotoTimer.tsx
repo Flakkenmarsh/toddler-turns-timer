@@ -418,8 +418,10 @@ export function PhotoTimer() {
   const showMarker = !running && !alarming;
 
   return (
-    <div className={`min-h-screen w-full flex flex-col items-center ${running ? "justify-center py-6" : "justify-between py-10"} px-6 bg-background text-foreground select-none`}>
-      <header className={`w-full flex items-center justify-between ${running ? "hidden" : ""}`}>
+    <div className="relative min-h-[100dvh] w-full flex flex-col items-center justify-center px-6 bg-background text-foreground select-none overflow-hidden">
+      <header
+        className={`absolute top-0 left-0 right-0 z-30 px-6 py-10 flex items-center justify-between transition-opacity duration-150 ${running ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+      >
         <h1 className="text-lg font-semibold tracking-tight">Photo Timer</h1>
         <button
           ref={rosterButtonRef}
@@ -434,7 +436,7 @@ export function PhotoTimer() {
       {showRoster && !running && (
         <div
           ref={rosterRef}
-          className="w-full max-w-md rounded-2xl border border-border bg-card/60 backdrop-blur p-3 space-y-2"
+          className="absolute top-28 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-3rem)] max-w-md rounded-2xl border border-border bg-card/60 backdrop-blur p-3 space-y-2"
         >
           {players.length === 0 && (
             <p className="text-xs text-muted-foreground text-center py-2">
@@ -503,7 +505,7 @@ export function PhotoTimer() {
       )}
 
       <div className="relative flex flex-col items-center justify-center">
-        <div className={`min-h-10 text-3xl font-semibold tracking-tight text-center whitespace-nowrap ${running ? "absolute -top-14 left-1/2 -translate-x-1/2" : "mb-4"}`}>
+        <div className="absolute -top-14 left-1/2 -translate-x-1/2 min-h-10 text-3xl font-semibold tracking-tight text-center whitespace-nowrap">
           {currentPlayer ? currentPlayer.name : ""}
         </div>
 
@@ -513,7 +515,7 @@ export function PhotoTimer() {
           width={SIZE}
           height={SIZE}
           viewBox={`0 0 ${SIZE} ${SIZE}`}
-          className={`touch-none transition-transform ${alarming ? "animate-pulse" : ""}`}
+          className={`touch-none ${alarming ? "animate-pulse" : ""}`}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
@@ -619,7 +621,9 @@ export function PhotoTimer() {
         </div>
       </div>
 
-      <div className={`items-center gap-6 ${running ? "hidden" : "flex"}`}>
+      <div
+        className={`absolute bottom-0 left-0 right-0 z-30 py-10 flex items-center justify-center gap-6 transition-opacity duration-150 ${running ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+      >
         <button
           onClick={reset}
           className="h-12 w-12 rounded-full border border-border bg-card/40 backdrop-blur flex items-center justify-center hover:bg-card/70 transition"
