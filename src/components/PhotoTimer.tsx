@@ -226,6 +226,10 @@ export function PhotoTimer() {
     };
   }, [showRoster]);
 
+  const nextTurn = () => {
+    setCurrentIndex((i) => (players.length ? (i + 1) % players.length : 0));
+  };
+
   const stopAlarm = () => {
     alarmStopRef.current?.();
     setAlarming(false);
@@ -296,7 +300,7 @@ export function PhotoTimer() {
       stopAlarm();
       exitFullscreen();
       if (players.length) {
-        setCurrentIndex((i) => (i + 1) % players.length);
+        nextTurn();
       }
       setRemaining(duration);
       return;
@@ -385,7 +389,7 @@ export function PhotoTimer() {
     if (alarming) {
       stopAlarm();
       exitFullscreen();
-      setCurrentIndex((i) => (players.length ? (i + 1) % players.length : 0));
+      nextTurn();
       setRemaining(duration);
       return;
     }
