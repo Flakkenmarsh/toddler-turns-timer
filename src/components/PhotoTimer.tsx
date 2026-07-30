@@ -226,6 +226,10 @@ export function PhotoTimer() {
     };
   }, [showRoster]);
 
+  const nextTurn = () => {
+    setCurrentIndex((i) => (players.length ? (i + 1) % players.length : 0));
+  };
+
   const stopAlarm = () => {
     alarmStopRef.current?.();
     setAlarming(false);
