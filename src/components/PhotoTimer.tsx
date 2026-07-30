@@ -300,7 +300,7 @@ export function PhotoTimer() {
       stopAlarm();
       exitFullscreen();
       if (players.length) {
-        setCurrentIndex((i) => (i + 1) % players.length);
+        nextTurn();
       }
       setRemaining(duration);
       return;
