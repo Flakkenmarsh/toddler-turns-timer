@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Play, Pause, RotateCcw, Plus, Trash2, Pencil, Users } from "lucide-react";
+import { Play, Pause, RotateCcw, Plus, Trash2, Pencil, Users, Bookmark, Save } from "lucide-react";
 
 const SIZE = 320;
 const CENTER = SIZE / 2;
@@ -10,8 +10,11 @@ const MAX_SECONDS = 30 * 60; // 30 min max
 const DRAG_THRESHOLD_PX = 6;
 const RECENTS_KEY = "photoTimer.recentImages.v1";
 const MAX_RECENTS = 10;
+const SESSIONS_KEY = "photoTimer.sessions.v1";
+const LONG_PRESS_MS = 3000;
 
 type Player = { id: string; name: string; photo: string | null };
+type Session = { id: string; name: string; players: Player[]; duration: number };
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -54,6 +57,9 @@ export function PhotoTimer() {
   const [running, setRunning] = useState(false);
   const [alarming, setAlarming] = useState(false);
   const [showRoster, setShowRoster] = useState(false);
+  const [showSessions, setShowSessions] = useState(false);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [newSessionName, setNewSessionName] = useState("");
   const [pickerPlayerId, setPickerPlayerId] = useState<string | null>(null);
   const [recents, setRecents] = useState<string[]>([]);
   const dragging = useRef(false);
@@ -61,6 +67,10 @@ export function PhotoTimer() {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const rosterRef = useRef<HTMLDivElement | null>(null);
   const rosterButtonRef = useRef<HTMLButtonElement | null>(null);
+  const sessionsRef = useRef<HTMLDivElement | null>(null);
+  const sessionsButtonRef = useRef<HTMLButtonElement | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFired = useRef(false);
   const photoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const modalPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -97,6 +107,53 @@ export function PhotoTimer() {
 
   const removeRecent = (dataUrl: string) => {
     persistRecents(recents.filter((u) => u !== dataUrl));
+  };
+
+  // Load saved sessions from localStorage
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SESSIONS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setSessions(parsed as Session[]);
+      }
+    } catch {
+      /* noop */
+    }
+  }, []);
+
+  const persistSessions = (list: Session[]) => {
+    setSessions(list);
+    try {
+      localStorage.setItem(SESSIONS_KEY, JSON.stringify(list));
+    } catch {
+      /* noop, quota */
+    }
+  };
+
+  const saveSession = () => {
+    const name = newSessionName.trim();
+    if (!name || players.length === 0) return;
+    const entry: Session = {
+      id: uid(),
+      name,
+      players: players.map((p) => ({ ...p })),
+      duration,
+    };
+    persistSessions([entry, ...sessions.filter((s) => s.name !== name)]);
+    setNewSessionName("");
+  };
+
+  const loadSession = (s: Session) => {
+    setPlayers(s.players.map((p) => ({ ...p })));
+    setCurrentIndex(0);
+    setDuration(s.duration);
+    setRemaining(s.duration);
+    setShowSessions(false);
+  };
+
+  const deleteSession = (id: string) => {
+    persistSessions(sessions.filter((s) => s.id !== id));
   };
 
   const currentPlayer = players[currentIndex] ?? null;
@@ -226,6 +283,28 @@ export function PhotoTimer() {
     };
   }, [showRoster]);
 
+  // Auto-close sessions panel when touching outside it
+  useEffect(() => {
+    if (!showSessions) return;
+    const close = (e: PointerEvent | TouchEvent) => {
+      const target = e.target as Node;
+      if (
+        sessionsRef.current &&
+        sessionsButtonRef.current &&
+        !sessionsRef.current.contains(target) &&
+        !sessionsButtonRef.current.contains(target)
+      ) {
+        setShowSessions(false);
+      }
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("touchstart", close);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("touchstart", close);
+    };
+  }, [showSessions]);
+
   const nextTurn = () => {
     setCurrentIndex((i) => (players.length ? (i + 1) % players.length : 0));
   };
@@ -298,7 +377,6 @@ export function PhotoTimer() {
   const onPointerDown = (e: React.PointerEvent) => {
     if (alarming) {
       stopAlarm();
-      exitFullscreen();
       if (players.length) {
         nextTurn();
       }
@@ -308,6 +386,14 @@ export function PhotoTimer() {
     const el = e.target as Element;
     el.setPointerCapture(e.pointerId);
     dragging.current = true;
+    longPressFired.current = false;
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    longPressTimer.current = setTimeout(() => {
+      if (dragging.current && !dragStart.current.hasMoved) {
+        longPressFired.current = true;
+        exitFullscreen();
+      }
+    }, LONG_PRESS_MS);
     dragStart.current = {
       angle: angleFromPoint(e.clientX, e.clientY),
       duration,
@@ -323,6 +409,10 @@ export function PhotoTimer() {
     const dy = e.clientY - dragStart.current.y;
     if (Math.hypot(dx, dy) > DRAG_THRESHOLD_PX) {
       dragStart.current.hasMoved = true;
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
       // Pause if the user begins dragging while the timer is running.
       if (running) setRunning(false);
     }
@@ -334,12 +424,20 @@ export function PhotoTimer() {
   const onPointerUp = (e: React.PointerEvent) => {
     const wasDragging = dragging.current;
     dragging.current = false;
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
     try {
       (e.target as Element).releasePointerCapture(e.pointerId);
     } catch {
       /* noop */
     }
     if (!wasDragging) return;
+    if (longPressFired.current) {
+      longPressFired.current = false;
+      return;
+    }
     if (!dragStart.current.hasMoved) {
       // A clean tap toggles play/pause.
       if (remaining <= 0) {
@@ -348,8 +446,8 @@ export function PhotoTimer() {
         enterFullscreen();
       } else {
         setRunning((r) => {
-          if (r) exitFullscreen();
-          else enterFullscreen();
+          // Tap only pauses/resumes; fullscreen is exited with a long press.
+          if (!r) enterFullscreen();
           return !r;
         });
       }
@@ -388,7 +486,6 @@ export function PhotoTimer() {
   const togglePlay = () => {
     if (alarming) {
       stopAlarm();
-      exitFullscreen();
       nextTurn();
       setRemaining(duration);
       return;
@@ -400,8 +497,7 @@ export function PhotoTimer() {
       return;
     }
     setRunning((r) => {
-      if (r) exitFullscreen();
-      else enterFullscreen();
+      if (!r) enterFullscreen();
       return !r;
     });
   };
