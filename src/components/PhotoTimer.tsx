@@ -523,20 +523,98 @@ export function PhotoTimer() {
         className={`absolute top-0 left-0 right-0 z-30 px-6 py-10 flex items-center justify-between transition-opacity duration-150 ${running ? "opacity-0 pointer-events-none" : "opacity-100"}`}
       >
         <h1 className="text-lg font-semibold tracking-tight">Photo Timer</h1>
-        <button
-          ref={rosterButtonRef}
-          onClick={() => setShowRoster((s) => !s)}
-          className="inline-flex items-center gap-2 rounded-full border border-border bg-card/40 backdrop-blur px-4 py-2 text-sm hover:bg-card/70 transition"
-        >
-          <Users className="h-4 w-4" />
-          Players ({players.length})
-        </button>
+        <div className="flex flex-col items-end gap-2">
+          <button
+            ref={rosterButtonRef}
+            onClick={() => {
+              setShowSessions(false);
+              setShowRoster((s) => !s);
+            }}
+            className="inline-flex items-center gap-2 rounded-full border border-border bg-card/40 backdrop-blur px-4 py-2 text-sm hover:bg-card/70 transition"
+          >
+            <Users className="h-4 w-4" />
+            Players ({players.length})
+          </button>
+          <button
+            ref={sessionsButtonRef}
+            onClick={() => {
+              setShowRoster(false);
+              setShowSessions((s) => !s);
+            }}
+            className="inline-flex items-center gap-2 rounded-full border border-border bg-card/40 backdrop-blur px-4 py-2 text-sm hover:bg-card/70 transition"
+          >
+            <Bookmark className="h-4 w-4" />
+            Sessions ({sessions.length})
+          </button>
+        </div>
       </header>
+
+      {showSessions && !running && (
+        <div
+          ref={sessionsRef}
+          className="absolute top-40 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-3rem)] max-w-md rounded-2xl border border-border bg-card/60 backdrop-blur p-3 space-y-2"
+        >
+          <div className="flex items-center gap-2">
+            <input
+              value={newSessionName}
+              onChange={(e) => setNewSessionName(e.target.value)}
+              placeholder="Name this session"
+              className="flex-1 bg-transparent border-b border-border/60 focus:border-primary outline-none text-sm py-1"
+            />
+            <button
+              onClick={saveSession}
+              disabled={!newSessionName.trim() || players.length === 0}
+              className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-xs hover:bg-card/70 transition disabled:opacity-40"
+            >
+              <Save className="h-3.5 w-3.5" /> Save
+            </button>
+          </div>
+          {sessions.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-2">
+              No saved sessions yet. Set up your players, then save them here (stored only on this device).
+            </p>
+          ) : (
+            sessions.map((s) => (
+              <div key={s.id} className="flex items-center gap-2 rounded-xl px-2 py-2">
+                <div className="flex -space-x-2 shrink-0">
+                  {s.players.slice(0, 3).map((p) => (
+                    <div
+                      key={p.id}
+                      className="h-8 w-8 rounded-full overflow-hidden border border-border bg-muted"
+                    >
+                      {p.photo && <img src={p.photo} alt="" className="h-full w-full object-cover" />}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm truncate">{s.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {s.players.length} players · {fmt(s.duration)}
+                  </p>
+                </div>
+                <button
+                  onClick={() => loadSession(s)}
+                  className="text-xs rounded-full px-3 py-1 border border-border hover:bg-card/70"
+                >
+                  Load
+                </button>
+                <button
+                  onClick={() => deleteSession(s.id)}
+                  className="h-8 w-8 rounded-full flex items-center justify-center hover:bg-destructive/20 text-destructive"
+                  aria-label="Delete session"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
       {showRoster && !running && (
         <div
           ref={rosterRef}
-          className="absolute top-28 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-3rem)] max-w-md rounded-2xl border border-border bg-card/60 backdrop-blur p-3 space-y-2"
+          className="absolute top-40 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-3rem)] max-w-md rounded-2xl border border-border bg-card/60 backdrop-blur p-3 space-y-2"
         >
           {players.length === 0 && (
             <p className="text-xs text-muted-foreground text-center py-2">
